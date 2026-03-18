@@ -18,6 +18,8 @@
 
 package com.wire.kalium.persistence.dao.backup
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+
 import com.wire.kalium.persistence.ConversationsQueries
 import com.wire.kalium.persistence.MessageAttachmentsQueries
 import com.wire.kalium.persistence.MessagesQueries
@@ -81,7 +83,7 @@ internal class NomadMessagesDAOImpl internal constructor(
         )
     }
 
-    private fun insertPlaceholderUsers(messages: List<NomadMessageToInsert>) {
+    private suspend fun insertPlaceholderUsers(messages: List<NomadMessageToInsert>) {
         messages
             .asSequence()
             .map { it.payload.senderUserId }
@@ -89,7 +91,7 @@ internal class NomadMessagesDAOImpl internal constructor(
             .forEach { usersQueries.insertOrIgnoreUserId(it) }
     }
 
-    private fun insertPlaceholderConversations(messages: List<NomadMessageToInsert>) {
+    private suspend fun insertPlaceholderConversations(messages: List<NomadMessageToInsert>) {
         messages
             .groupBy { it.conversationId }
             .forEach { (conversationId, conversationMessages) ->
@@ -100,12 +102,12 @@ internal class NomadMessagesDAOImpl internal constructor(
             }
     }
 
-    private fun insertMessages(messages: List<NomadMessageToInsert>): Int =
+    private suspend fun insertMessages(messages: List<NomadMessageToInsert>): Int =
         messages.count { message ->
             insertMessageWithContentOrThrow(message)
         }
 
-    private fun insertMessageWithContentOrThrow(message: NomadMessageToInsert): Boolean {
+    private suspend fun insertMessageWithContentOrThrow(message: NomadMessageToInsert): Boolean {
         messagesQueries.insertOrIgnoreMessage(
             id = message.id,
             content_type = message.payload.contentType,
@@ -120,7 +122,7 @@ internal class NomadMessagesDAOImpl internal constructor(
             expire_after_millis = null,
             self_deletion_end_date = null,
         )
-        val insertedMessage = messagesQueries.selectChanges().executeAsOne() > 0
+        val insertedMessage = messagesQueries.selectChanges().awaitAsOne() > 0
         if (!insertedMessage) {
             return false
         }
@@ -132,7 +134,7 @@ internal class NomadMessagesDAOImpl internal constructor(
         return true
     }
 
-    private fun insertRegularContent(message: NomadMessageToInsert): Boolean {
+    private suspend fun insertRegularContent(message: NomadMessageToInsert): Boolean {
         val content = message.payload
         return when (content) {
             is SyncableMessagePayloadEntity.Text -> insertTextContent(message, content)
@@ -147,7 +149,7 @@ internal class NomadMessagesDAOImpl internal constructor(
         }
     }
 
-    private fun insertTextContent(
+    private suspend fun insertTextContent(
         message: NomadMessageToInsert,
         content: SyncableMessagePayloadEntity.Text,
     ): Boolean {
@@ -158,7 +160,7 @@ internal class NomadMessagesDAOImpl internal constructor(
             quoted_message_id = content.quotedMessageId,
             is_quote_verified = true,
         )
-        val insertedContent = messagesQueries.selectChanges().executeAsOne() > 0
+        val insertedContent = messagesQueries.selectChanges().awaitAsOne() > 0
         content.mentions.forEach {
             messagesQueries.insertMessageMention(
                 message_id = message.id,
@@ -172,7 +174,7 @@ internal class NomadMessagesDAOImpl internal constructor(
     }
 
     @Suppress("ComplexCondition")
-    private fun insertAssetContent(
+    private suspend fun insertAssetContent(
         message: NomadMessageToInsert,
         content: SyncableMessagePayloadEntity.Asset,
     ): Boolean {
@@ -206,10 +208,10 @@ internal class NomadMessagesDAOImpl internal constructor(
             asset_duration_ms = content.durationMs,
             asset_normalized_loudness = content.normalizedLoudness,
         )
-        return messagesQueries.selectChanges().executeAsOne() > 0
+        return messagesQueries.selectChanges().awaitAsOne() > 0
     }
 
-    private fun insertLocationContent(
+    private suspend fun insertLocationContent(
         message: NomadMessageToInsert,
         content: SyncableMessagePayloadEntity.Location,
     ): Boolean {
@@ -228,10 +230,10 @@ internal class NomadMessagesDAOImpl internal constructor(
             name = content.name,
             zoom = content.zoom,
         )
-        return messagesQueries.selectChanges().executeAsOne() > 0
+        return messagesQueries.selectChanges().awaitAsOne() > 0
     }
 
-    private fun insertMultipartContent(
+    private suspend fun insertMultipartContent(
         message: NomadMessageToInsert,
         content: SyncableMessagePayloadEntity.Multipart,
     ): Boolean {
@@ -242,7 +244,7 @@ internal class NomadMessagesDAOImpl internal constructor(
             quoted_message_id = content.quotedMessageId,
             is_quote_verified = true,
         )
-        val insertedContent = messagesQueries.selectChanges().executeAsOne() > 0
+        val insertedContent = messagesQueries.selectChanges().awaitAsOne() > 0
         content.mentions.forEach {
             messagesQueries.insertMessageMention(
                 message_id = message.id,
@@ -273,7 +275,7 @@ internal class NomadMessagesDAOImpl internal constructor(
         return insertedContent
     }
 
-    private fun insertUnknownContent(
+    private suspend fun insertUnknownContent(
         messageId: String,
         conversationId: QualifiedIDEntity,
         typeName: String?,
@@ -284,7 +286,7 @@ internal class NomadMessagesDAOImpl internal constructor(
             unknown_encoded_data = null,
             unknown_type_name = typeName,
         )
-        return messagesQueries.selectChanges().executeAsOne() > 0
+        return messagesQueries.selectChanges().awaitAsOne() > 0
     }
 
     private companion object {

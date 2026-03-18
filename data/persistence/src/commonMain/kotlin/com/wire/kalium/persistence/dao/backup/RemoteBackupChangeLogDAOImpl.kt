@@ -18,6 +18,8 @@
 
 package com.wire.kalium.persistence.dao.backup
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+
 import app.cash.sqldelight.coroutines.asFlow
 import com.wire.kalium.persistence.RemotebackupChangeLogQueries
 import com.wire.kalium.persistence.dao.QualifiedIDEntity
@@ -113,7 +115,7 @@ internal class RemoteBackupChangeLogDAOImpl(
 
     override suspend fun getPendingChanges(): List<ChangeLogEntry> =
         withContext(readDispatcher.value) {
-            queries.getPendingChanges(mapper = mapper::toChangeLogEntry).executeAsList()
+            queries.getPendingChanges(mapper = mapper::toChangeLogEntry).awaitAsList()
         }
 
     override suspend fun getLastPendingChangesBatch(limit: Long): ChangeLogSyncBatch =
@@ -122,11 +124,11 @@ internal class RemoteBackupChangeLogDAOImpl(
                 val events = queries.getLastPendingChangesWithPayload(
                     limit = limit,
                     mapper = mapper::toChangeLogSyncEvent
-                ).executeAsList()
+                ).awaitAsList()
                 val conversationLastReads = queries.getConversationLastReadForLastPendingChanges(
                     limit = limit,
                     mapper = mapper::toConversationLastReadSyncEntity
-                ).executeAsList()
+                ).awaitAsList()
                 ChangeLogSyncBatch(
                     events = events,
                     conversationLastReads = conversationLastReads
