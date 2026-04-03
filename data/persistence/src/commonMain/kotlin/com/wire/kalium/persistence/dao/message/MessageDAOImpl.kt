@@ -18,6 +18,7 @@
 
 package com.wire.kalium.persistence.dao.message
 
+import app.cash.sqldelight.async.coroutines.await
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
@@ -98,7 +99,7 @@ internal class MessageDAOImpl internal constructor(
             queries.markMessageAsDeleted(
                 message_id = id,
                 conversation_id = conversationsId
-            )
+            ).await()
             unreadEventsQueries.deleteUnreadEvent(id, conversationsId)
         }
     }
@@ -536,7 +537,7 @@ internal class MessageDAOImpl internal constructor(
                 conversation_id = conversationId,
                 message_id = messageUuid,
                 delivery_duration = Instant.fromEpochMilliseconds(millis)
-            )
+            ).await()
         }
     }
 
