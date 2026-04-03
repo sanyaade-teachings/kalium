@@ -1,6 +1,7 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Agents when working with code in this repository.
+See https://agents.md/ for details about this file type.
 
 ## Project Overview
 
@@ -9,10 +10,10 @@ Kalium is a Kotlin Multiplatform (KMP) messaging SDK for the Wire messaging plat
 **Requirements:** JDK 21, Git, macOS Apple Silicon for iOS builds
 
 **Key Technologies:**
-- Kotlin 2.2.21 with Kotlin Multiplatform
+- Kotlin 2.3.0 with Kotlin Multiplatform
 - Gradle with Kotlin DSL
 - SQLDelight 2.2.1 for database layer (SQLCipher encrypted)
-- Ktor 3.3.2 for HTTP networking
+- Ktor 3.4.0 for HTTP networking
 - CoreCrypto 9.1.3 + libsodium for cryptography (MLS protocol)
 - AVS 10.1.33 for audio/video calling
 - Protocol Buffers (pbandk) for serialization
@@ -49,7 +50,8 @@ Kalium is a Kotlin Multiplatform (KMP) messaging SDK for the Wire messaging plat
 ./gradlew detekt
 
 # Database migration verification
-./gradlew :data:persistence:verifySqlDelightMigration
+./gradlew :data:persistence:jvmTest --tests com.wire.kalium.persistence.migrations.VerifyDatabaseMigrationsTest
+./gradlew :data:persistence:verifySqlDelightMigration # Use this when we upgrade SQLDelight to avoid hanging on the test task
 
 # Code coverage
 ./gradlew jvmTest koverXmlReport -Djava.library.path=./native/libs
@@ -71,28 +73,13 @@ See [docs/IOS_BUILD.md](docs/IOS_BUILD.md) for comprehensive iOS build documenta
 - `macosArm64` - macOS on Apple Silicon
 
 ```bash
-# Build libraries
-./gradlew :logic:compileKotlinIosArm64 -PUSE_UNIFIED_CORE_CRYPTO=true
-./gradlew :logic:compileKotlinIosSimulatorArm64 -PUSE_UNIFIED_CORE_CRYPTO=true
+# iOS tests (requires Apple Silicon Mac and unified CoreCrypto)
+./gradlew iosSimulatorArm64Test -PUSE_UNIFIED_CORE_CRYPTO=true
+./gradlew iOSOnlyAffectedTest -PUSE_UNIFIED_CORE_CRYPTO=true
 
-# Build debug frameworks
-./gradlew :logic:linkDebugFrameworkIosArm64 -PUSE_UNIFIED_CORE_CRYPTO=true
+# iOS framework builds — see docs/IOS_BUILD.md for full details
 ./gradlew :logic:linkDebugFrameworkIosSimulatorArm64 -PUSE_UNIFIED_CORE_CRYPTO=true
-
-# Build release frameworks
-./gradlew :logic:linkReleaseFrameworkIosArm64 -PUSE_UNIFIED_CORE_CRYPTO=true
-./gradlew :logic:linkReleaseFrameworkIosSimulatorArm64 -PUSE_UNIFIED_CORE_CRYPTO=true
-
-# Create XCFramework for distribution
-xcodebuild -create-xcframework \
-    -framework logic/build/bin/iosArm64/releaseFramework/logic.framework \
-    -framework logic/build/bin/iosSimulatorArm64/releaseFramework/logic.framework \
-    -output logic/build/logic.xcframework
 ```
-
-Framework output location: `logic/build/bin/<target>/debugFramework/logic.framework`
-
-**Note:** iOS and JS builds require `USE_UNIFIED_CORE_CRYPTO=true`. Either set it in gradle.properties or pass `-PUSE_UNIFIED_CORE_CRYPTO=true` on the command line.
 
 User provider cache mode can be controlled at compile time with:
 - `kalium.providerCacheScope` is required and has no Kalium default; consumer builds must set it explicitly
@@ -136,6 +123,7 @@ Modules are organized by layer with colon-separated paths:
 - `:core:common` - Shared data models, utilities, and `Either<Failure, Success>` error handling
 - `:core:data` - Data layer abstractions and DTOs
 - `:core:cryptography` - Encryption using libsodium and CoreCrypto
+- `:core:libsodium` - Libsodium bindings wrapper for cryptographic primitives
 - `:core:logger` - Logging infrastructure (Kermit-based)
 - `:core:util` - General utilities
 
@@ -155,6 +143,9 @@ Modules are organized by layer with colon-separated paths:
 - `:domain:conversation-history` - Conversation history management
 - `:domain:messaging:sending` - Message sending pipeline
 - `:domain:messaging:receiving` - Message receiving and processing
+- `:domain:nomaddevice` - Nomad device session management (forced logout, data wipe on expiry)
+- `:domain:usernetwork` - User network configuration
+- `:domain:userstorage` - User storage management
 - `:domain:work` - Background work management
 
 **Logic:**
@@ -179,29 +170,9 @@ Each module has platform-specific source sets:
 - `jvmMain/jvmTest` - JVM-specific code
 - `androidMain/androidUnitTest` - Android-specific code
 - `iosMain/iosTest` - iOS (partial support)
-- `jsMain/jsTest -PUSE_UNIFIED_CORE_CRYPTO=true` - JavaScript (minimal support)
+- `jsMain/jsTest` - JavaScript (minimal support)
 
-## Testing
-
-**Frameworks:**
-- Mockative for mocking (`@Mock` for interfaces, `@Mockable` for classes)
-- Turbine for Flow testing (`test {}` blocks)
-- Robolectric for Android unit tests
-- Use `:data:persistence-test` fixtures for in-memory database testing
-
-Place common tests in `commonTest` when possible.
-
-## Code Conventions
-
-- `suspend` functions for async, `Flow` for reactive streams
-- `Either<Failure, Success>` pattern for error handling (from `:core:common`)
-- `kotlinx-datetime` types (`Instant`, `LocalDateTime`) for dates
-- `kotlinx.serialization` with `@Serializable` annotation
-- Repository pattern in `:data:*`, use cases in `:logic`
-- Constructor injection (no DI framework)
-- Mappers in `:data:data-mappers` for model transformations
-
-## Database
+### Database
 
 Two SQLDelight databases:
 - **UserDatabase** (`db_user/`) - User-specific data (messages, conversations)
@@ -209,15 +180,6 @@ Two SQLDelight databases:
 
 Schema files: `data/persistence/src/commonMain/db_*/com/wire/kalium/persistence/*.sq`
 Migrations: `data/persistence/src/commonMain/db_*/migrations/`
-
-## Detekt Setup
-
-Config: `detekt/detekt.yml`, Baseline: `detekt/baseline.xml`
-
-IDE Setup: Settings → Tools → Detekt:
-- Configuration Files: `$PROJECT_ROOT/detekt/detekt.yml`
-- Baseline File: `$PROJECT_ROOT/detekt/baseline.xml`
-- Plugin Jars: `$PROJECT_ROOT/detekt-rules/build/libs/detekt-rules.jar`
 
 ## Module Dependencies
 
@@ -228,3 +190,108 @@ The project follows a strict layered architecture:
 - **Logic** depends on all layers and orchestrates them
 
 The `:logic` module is the main SDK entry point that clients interact with.
+
+## Testing
+
+**Frameworks:**
+- Mockative for mocking (`@Mock` for interfaces, `@Mockable` for classes; being phased out — do not use unless the test file already does)
+- Prefer Mokkery for mocking (`mock<SomeClass>()`; being phased in)
+- Turbine for Flow testing (`test {}` blocks)
+- Robolectric for Android unit tests
+- Use `:data:persistence-test` fixtures for in-memory database testing
+- Architectural fitness functions tests are located in `logic/src/jvmTest/kotlin/com/wire/kalium/logic/architecture` and can be run or extended
+
+**Test naming convention:** 
+
+Use `givenX_whenY_thenZ` for all test function names:
+```kotlin
+fun givenEmailHasLeadingOrTrailingSpaces_whenLoggingIn_thenShouldBeTrimmed()
+```
+
+**Platform test source sets:**
+- `commonTest` — preferred for multiplatform tests
+- `jvmTest` — JVM-only (requires `-Djava.library.path=./native/libs`)
+- `androidHostTest` — Android unit tests (Robolectric)
+- `androidDeviceTest` — Android instrumented tests
+- `appleTest` — iOS/macOS tests
+- `jsTest` — JavaScript tests
+
+**Reusable test infrastructure:**
+- `GlobalDBBaseTest` / `BaseDatabaseTest` in `:data:persistence-test` — use for database tests (in-memory DB setup)
+- `:test:data-mocks` — mock factories for users, conversations, messages
+
+**Architectural tests:** Konsist fitness functions enforce layer boundaries and use case patterns:
+- Located at: `logic/src/jvmTest/kotlin/com/wire/kalium/logic/architecture/`
+- Run with: `./gradlew :logic:jvmTest --tests "*architecture*"`
+
+## Code Conventions
+
+- `suspend` functions for async, `Flow` for reactive streams
+- `Either<Failure, Success>` pattern for error handling (from `:core:common`)
+- `kotlinx-datetime` types (`Instant`, `LocalDateTime`) for dates
+- `kotlinx.serialization` with `@Serializable` annotation
+- Repository pattern in `:data:*`, use cases in `:logic`
+- Constructor injection (no DI framework)
+- Mappers in `:data:data-mappers` for model transformations
+- `:logic` exposes concrete types and does not expose `Either` types
+
+## Common Pitfalls
+
+- **JVM tests fail silently** without `-Djava.library.path=./native/libs`
+- **iOS/JS builds fail** without `-PUSE_UNIFIED_CORE_CRYPTO=true`
+- **`kalium.providerCacheScope` has no default** — consumers must explicitly set `LOCAL` or `GLOBAL`
+- **`:logic` must NOT expose `Either<>` types** to callers — wrap results in concrete types
+- **Mokkery over Mockative:** use `mock<SomeClass>()` (Mokkery) for new tests; only use `@Mock`/`@Mockable` (Mockative) if the test file already does
+- **`shadowJar` service discovery:** requires `duplicatesStrategy = DuplicatesStrategy.INCLUDE` before `mergeServiceFiles()` in `tools/testservice/build.gradle.kts`
+
+## Security Guidelines and Permissions
+
+- Never read secrets in the codebase.
+    - API keys, passwords, tokens, should always be ignored and not processed.
+- Allowed Without Prompting:
+    - Read any source file.
+    - Run linters, formatters, type checkers on single files.
+    - Run unit tests on specific test files.
+- Require Approval First:
+    - Adding a new library/dependency.
+    - Changing the dependencies between modules.
+    - Git operations (`git push`, `git commit`).
+    - Deleting files or directories.
+    - Running full build or E2E tests.
+    - Modifying CI/CD configuration and scripts.
+    - Introducing a new architectural pattern or design convention.
+
+## Agent Commandments
+
+Adhere to the following guidelines for each session:
+
+### 1. Write code that can be tested
+- If the code is not possible to test, then it is not a valid solution.
+
+### 2. All tests of changed packages must be green
+- Run `./gradlew :<module>:jvmTest` for each package you modified before finishing.
+- All new and modified code paths must be covered by tests.
+- When fixing a bug, add a regression test.
+
+### 3. Follow project patterns
+- **Use cases:** define a functional interface in `:logic`, impl in the same package, injected via constructor.
+- **Data flow:** Network model → Repository → Mapper → Use case → exposed via `UserSession`/`GlobalKaliumScope`.
+- **Error handling:** Use `Either<CoreFailure, T>` in data/domain layers. `:logic` exposes concrete return types to callers — never `Either`.
+- **Constructor injection** — no DI framework; pass all dependencies at construction time.
+
+### 4. Respect module boundaries
+- Dependency direction: `core → data → domain → logic`. Never invert.
+- Do not cross module boundaries without checking existing dependency rules.
+- See `docs/adr/` for architectural decision records before making structural changes.
+
+### 5. Document architectural changes with an ADR
+- Adding a new library/dependency or introducing a new pattern requires an ADR in `docs/adr/`.
+- Name it sequentially: `docs/adr/XXXX-kebab-case-title.md` (see `0000-template-lightway-adr.md` for the template).
+- Get the ADR approved before implementing the change.
+
+### 6. Limit scope and ask when uncertain
+- Focus on narrow, well-defined tasks.
+- **Require approval before:** adding a dependency, changing module dependencies, introducing a new pattern, touching CI/CD, deleting files, running full builds.
+
+### 7. Run linter before finishing
+- `./gradlew detekt` — must pass on all changed files.

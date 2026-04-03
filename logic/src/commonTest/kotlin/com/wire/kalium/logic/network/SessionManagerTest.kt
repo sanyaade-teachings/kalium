@@ -48,6 +48,7 @@ import io.mockative.coVerify
 import io.mockative.eq
 import io.mockative.every
 import io.mockative.mock
+import io.mockative.once
 import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
@@ -265,8 +266,8 @@ class SessionManagerTest {
             }.invokes(block)
         }
 
-        fun withFullAccountInfoReturning(block: (args: Array<Any?>) -> Either<StorageFailure, Account>) = apply {
-            every {
+        suspend fun withFullAccountInfoReturning(block: suspend (args: Array<Any?>) -> Either<StorageFailure, Account>) = apply {
+            coEvery {
                 sessionRepository.fullAccountInfo(any())
             }.invokes(block)
         }

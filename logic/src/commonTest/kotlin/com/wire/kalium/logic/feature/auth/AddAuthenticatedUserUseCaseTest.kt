@@ -168,11 +168,11 @@ class AddAuthenticatedUserUseCaseTest {
             arrangement.sessionRepository.updateCurrentSession(any())
         }.wasInvoked(exactly = once)
 
-        verify {
+        coVerify {
             arrangement.serverConfigurationDAO.configById(any())
         }.wasInvoked(exactly = once)
 
-        verify {
+        coVerify {
             arrangement.sessionRepository.fullAccountInfo(any())
         }.wasInvoked(exactly = once)
         coVerify {
@@ -238,10 +238,10 @@ class AddAuthenticatedUserUseCaseTest {
         coVerify {
             arrangement.sessionRepository.updateCurrentSession(any())
         }.wasNotInvoked()
-        verify {
+        coVerify {
             arrangement.sessionRepository.fullAccountInfo(any())
         }.wasInvoked(exactly = once)
-        verify {
+        coVerify {
             arrangement.serverConfigurationDAO.configById(any())
         }.wasInvoked(exactly = once)
     }
@@ -427,18 +427,18 @@ class AddAuthenticatedUserUseCaseTest {
             coEvery { serverConfigurationDAO.configForUser(userId) }.returns(result)
         }
 
-        fun withFullAccountInfoResult(
+        suspend fun withFullAccountInfoResult(
             userId: UserId,
             result: Either<StorageFailure, Account>
         ) = apply {
-            every { sessionRepository.fullAccountInfo(userId) }.returns(result)
+            coEvery { sessionRepository.fullAccountInfo(userId) }.returns(result)
         }
 
-        fun withConfigByIdSuccess(
+        suspend fun withConfigByIdSuccess(
             serverConfigId: String,
             result: ServerConfigEntity
         ) = apply {
-            every { serverConfigurationDAO.configById(serverConfigId) }.returns(result)
+            coEvery { serverConfigurationDAO.configById(serverConfigId) }.returns(result)
         }
 
         suspend fun withStoreSessionResult(

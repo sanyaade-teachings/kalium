@@ -201,18 +201,18 @@ class CreateBackupUseCaseTest {
             }.returns(clientId?.let { Either.Right(it) } ?: Either.Left(StorageFailure.DataNotFound))
         }
 
-        fun withExportedDB(dbName: String?, dbData: ByteArray) = apply {
+        suspend fun withExportedDB(dbName: String?, dbData: ByteArray) = apply {
             with(fakeFileSystem) {
                 val exportedDBPath = dbName?.let { rootDBPath / it } ?: "null".toPath()
                 sink(exportedDBPath).buffer().use { it.write(dbData) }
-                every {
+                coEvery {
                     databaseExporter.exportToPlainDB(any())
-                }.returns(exportedDBPath.toString())
+            }.returns(exportedDBPath.toString())
             }
         }
 
-        fun withExportedDBError() = apply {
-            every {
+        suspend fun withExportedDBError() = apply {
+            coEvery {
                 databaseExporter.exportToPlainDB(any())
             }.returns(null)
         }

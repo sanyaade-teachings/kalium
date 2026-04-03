@@ -25,6 +25,8 @@ import com.wire.kalium.logic.data.user.UserId
 import com.wire.kalium.logic.test_util.TestNetworkException
 import com.wire.kalium.network.api.authenticated.nomaddevice.Conversation
 import com.wire.kalium.network.api.authenticated.nomaddevice.NomadAllMessagesResponse
+import com.wire.kalium.network.api.authenticated.nomaddevice.NomadBatchRestoreRequest
+import com.wire.kalium.network.api.authenticated.nomaddevice.NomadBatchRestoreResponse
 import com.wire.kalium.network.api.authenticated.nomaddevice.NomadConversationMetadata
 import com.wire.kalium.network.api.authenticated.nomaddevice.NomadConversationMetadataItem
 import com.wire.kalium.network.api.authenticated.nomaddevice.NomadConversationMetadataResponse
@@ -266,6 +268,11 @@ class SyncNomadMessagesDuringSlowSyncUseCaseTest {
             return allMessagesResponse
         }
 
+        override suspend fun restoreMessagesBatch(
+            request: NomadBatchRestoreRequest,
+        ): NetworkResponse<NomadBatchRestoreResponse> =
+            error("Not needed in this test")
+
         override suspend fun getConversationMetadata(): NetworkResponse<NomadConversationMetadataResponse> {
             calls += "getConversationMetadata"
             return metadataResponse
@@ -348,7 +355,7 @@ private fun metadataResponse(): NetworkResponse<NomadConversationMetadataRespons
             conversations = listOf(
                 NomadConversationMetadataItem(
                     conversation = Conversation(id = TEST_CONVERSATION_ID, domain = CONVERSATION_DOMAIN),
-                    metadata = NomadConversationMetadata(lastRead = TEST_LAST_READ_TIMESTAMP)
+                    metadata = NomadConversationMetadata(lastRead = TEST_LAST_READ_TIMESTAMP, lastModified = TEST_LAST_MODIFIED_TIMESTAMP)
                 )
             )
         ),
@@ -387,4 +394,5 @@ private fun qid(value: String): QualifiedIDEntity = QualifiedIDEntity(value = va
 
 private const val TEST_CONVERSATION_ID = "conversation-id"
 private const val TEST_LAST_READ_TIMESTAMP = 1_707_235_200_000L
+private const val TEST_LAST_MODIFIED_TIMESTAMP = 1_707_235_300_000L
 private const val CONVERSATION_DOMAIN = "wire.test"
