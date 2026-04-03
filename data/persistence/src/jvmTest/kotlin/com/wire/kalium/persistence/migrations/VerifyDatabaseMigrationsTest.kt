@@ -17,12 +17,14 @@
  */
 package com.wire.kalium.persistence.migrations
 
+import app.cash.sqldelight.async.coroutines.awaitMigrate
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.wire.kalium.persistence.GlobalDatabase
 import com.wire.kalium.persistence.UserDatabase
 import com.wire.kalium.persistence.migrations.dump.SchemaDump
 import com.wire.kalium.persistence.migrations.dump.SqliteSchemaDumper
 import dev.andrewbailey.diff.differenceOf
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -117,9 +119,11 @@ class VerifyDatabaseMigrationsTest {
             dbFile.parentFile.mkdirs()
             val driver = JdbcSqliteDriver("jdbc:sqlite:${dbFile.absolutePath}")
 
-            when (databaseSchemaSource) {
-                is DatabaseSchemaSource.UserDatabaseDefaults -> UserDatabase.Companion.Schema.create(driver)
-                is DatabaseSchemaSource.GlobalDatabaseDefaults -> GlobalDatabase.Companion.Schema.create(driver)
+            runBlocking {
+                when (databaseSchemaSource) {
+                    is DatabaseSchemaSource.UserDatabaseDefaults -> UserDatabase.Schema.create(driver).await()
+                    is DatabaseSchemaSource.GlobalDatabaseDefaults -> GlobalDatabase.Schema.create(driver).await()
+                }
             }
             driver.close()
             println("Fresh-schema DB created at: ${dbFile.absolutePath}")
@@ -130,18 +134,20 @@ class VerifyDatabaseMigrationsTest {
             dbFile.parentFile.mkdirs()
             val driver = JdbcSqliteDriver("jdbc:sqlite:${dbFile.absolutePath}")
 
-            when (databaseSchemaSource) {
-                is DatabaseSchemaSource.UserDatabaseDefaults -> UserDatabase.Companion.Schema.migrate(
-                    driver,
-                    34, // Starting from 34 since 33.sqm has errors.
-                    UserDatabase.Companion.Schema.version
-                )
+            runBlocking {
+                when (databaseSchemaSource) {
+                    is DatabaseSchemaSource.UserDatabaseDefaults -> UserDatabase.Companion.Schema.awaitMigrate(
+                        driver,
+                        34, // Starting from 34 since 33.sqm has errors.
+                        UserDatabase.Companion.Schema.version
+                    )
 
-                is DatabaseSchemaSource.GlobalDatabaseDefaults -> GlobalDatabase.Companion.Schema.migrate(
-                    driver,
-                    5, // Starting from 5 since 4.sqm has errors.
-                    GlobalDatabase.Companion.Schema.version
-                )
+                    is DatabaseSchemaSource.GlobalDatabaseDefaults -> GlobalDatabase.Companion.Schema.awaitMigrate(
+                        driver,
+                        5, // Starting from 5 since 4.sqm has errors.
+                        GlobalDatabase.Companion.Schema.version
+                    )
+                }
             }
             driver.close()
             println("Derived-from-migrations DB created at: ${dbFile.absolutePath}")
