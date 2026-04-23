@@ -17,17 +17,11 @@
  */
 package com.wire.kalium.logic.feature.service
 
-import com.wire.kalium.common.error.CoreFailure
 import com.wire.kalium.common.error.StorageFailure
-import com.wire.kalium.logic.data.id.SelfTeamIdProvider
-import com.wire.kalium.logic.data.id.TeamId
 import com.wire.kalium.logic.data.service.ServiceDetails
 import com.wire.kalium.logic.data.service.ServiceId
 import com.wire.kalium.logic.data.service.ServiceRepository
-import com.wire.kalium.logic.data.team.TeamRepository
-import com.wire.kalium.logic.framework.TestUser
 import com.wire.kalium.common.functional.Either
-import io.mockative.any
 import io.mockative.coEvery
 import io.mockative.mock
 import kotlinx.coroutines.flow.Flow
@@ -47,8 +41,6 @@ class ObserveAllServicesUseCaseTest {
         )
 
         val (_, observeAllServicesUseCase) = Arrangement()
-            .withSelfUserTeamId(Either.Right(TestUser.SELF.teamId))
-            .withSyncingServices()
             .withObserveAllServices(flowOf(Either.Right(expected)))
             .arrange()
 
@@ -62,8 +54,6 @@ class ObserveAllServicesUseCaseTest {
         val error = StorageFailure.DataNotFound
 
         val (_, observeAllServicesUseCase) = Arrangement()
-            .withSelfUserTeamId(Either.Right(TestUser.SELF.teamId))
-            .withSyncingServices()
             .withObserveAllServices(flowOf(Either.Left(error)))
             .arrange()
 
@@ -89,31 +79,13 @@ class ObserveAllServicesUseCaseTest {
 
     private class Arrangement {
         val serviceRepository: ServiceRepository = mock(ServiceRepository::class)
-        val teamRepository: TeamRepository = mock(TeamRepository::class)
-        val selfTeamIdProvider = mock(SelfTeamIdProvider::class)
 
-        private val useCase: ObserveAllServicesUseCase = ObserveAllServicesUseCaseImpl(
-            serviceRepository,
-            teamRepository,
-            selfTeamIdProvider
-        )
+        private val useCase: ObserveAllServicesUseCase = ObserveAllServicesUseCaseImpl(serviceRepository)
 
         suspend fun withObserveAllServices(result: Flow<Either<StorageFailure, List<ServiceDetails>>>) = apply {
             coEvery {
                 serviceRepository.observeAllServices()
             }.returns(result)
-        }
-
-        suspend fun withSelfUserTeamId(either: Either<CoreFailure, TeamId?>) = apply {
-            coEvery {
-                selfTeamIdProvider.invoke()
-            }.returns(either)
-        }
-
-        suspend fun withSyncingServices() = apply {
-            coEvery {
-                teamRepository.syncServices(any())
-            }.returns(Either.Right(Unit))
         }
 
         fun arrange() = this to useCase
